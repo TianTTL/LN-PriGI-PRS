@@ -7,7 +7,7 @@ The percentile can support research on lupus-nephritis susceptibility. This soft
 ## Requirements
 
 - R 4.3 or later
-- R packages: `data.table` and `digest`
+- R packages: `dplyr`, `data.table`, and `digest`
 - PLINK 1.9 installed locally and available on `PATH`, or supplied with `--plink`
 - Genotypes aligned to the hg19/GRCh37 assembly
 
