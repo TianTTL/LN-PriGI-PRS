@@ -1,0 +1,6 @@
+field	value
+reference_name	LN_WGS_controls
+source_profile	LN_WGS_PGS.gwas_prior_union.profile
+selection	FID starts with CTRL
+sample_count	171
+reference_sha256	bd4db3543b3f983a851979daab1e71c466b315aedcfb4f96436c84a32afc80ed
