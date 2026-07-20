@@ -91,13 +91,21 @@ All program-generated reports, tables, plots, messages, and warning codes are in
 
 The model, built-in reference distribution, fixed 10-sample acceptance dataset, and expected PGS values are versioned with SHA-256 checksums. Runtime assets are verified before scoring. The model is stored as an xz-compressed RDS; fixed PLINK test data are stored in a Deflate ZIP archive.
 
-Run the acceptance test after installing dependencies:
+## Maintainer tools
+
+Routine users only need `R/main.R`. Release maintainers and developers use the clearly separated tools below:
+
+- `tools/run_acceptance_tests.R`: verifies hashes, the fixed 10-sample golden PGS values, reports, plots, and supported PLINK 1 formats.
+- `tools/rebuild_frozen_assets.R`: rebuilds the frozen model, built-in reference, and expected test PGS values after an intentional model/reference update.
+- `tools/package_fixed_test_genotypes.ps1`: packages the unchanged BED/BIM/FAM acceptance cohort and refreshes SHA-256 manifests.
+
+Run the acceptance suite with PLINK 1.9 on `PATH`:
 
 ```bash
-Rscript tests/run_tests.R
+Rscript tools/run_acceptance_tests.R
 ```
 
-If PLINK is not at the test default location, set `LN_PRS_TEST_PLINK` first. When the model changes, keep the fixed test genotypes unchanged, rebuild the expected PGS values, refresh checksums, and rerun the acceptance test. `scripts/build_assets.R` documents the reproducible asset-build inputs.
+Alternatively, set `LN_PRS_TEST_PLINK` to the PLINK 1.9 executable. When the model changes, keep the fixed test genotypes unchanged, rebuild and package the assets, refresh checksums, and rerun the acceptance suite. Each tool contains maintainer-oriented usage instructions at the top of the file.
 
 ## License
 

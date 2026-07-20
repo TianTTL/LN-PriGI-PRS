@@ -1,4 +1,14 @@
 #!/usr/bin/env Rscript
+# Maintainer tool: rebuild the frozen model, built-in reference distribution,
+# and expected PGS values for the fixed acceptance cohort.
+#
+# Intended audience: release maintainers, not routine end users.
+# Run this only when the model or reference assets are intentionally updated.
+# Usage:
+#   Rscript tools/rebuild_frozen_assets.R WEIGHT_FILE HARMONIZED_BIM \
+#     REFERENCE_PROFILE TEST_PREFIX OUTPUT_DATA_DIR PLINK_1_9
+# The script writes versioned runtime assets under OUTPUT_DATA_DIR. Follow it
+# with package_fixed_test_genotypes.ps1 to package genotypes and refresh hashes.
 suppressPackageStartupMessages({
   library(data.table)
   library(digest)
@@ -6,7 +16,7 @@ suppressPackageStartupMessages({
 
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) != 6L) {
-  stop("Usage: build_assets.R <weight> <harmonized_bim> <reference_profile> <test_prefix> <output_data_dir> <plink>", call. = FALSE)
+  stop("Usage: rebuild_frozen_assets.R <weight> <harmonized_bim> <reference_profile> <test_prefix> <output_data_dir> <plink>", call. = FALSE)
 }
 weight_path <- normalizePath(args[[1]], mustWork = TRUE)
 bim_path <- normalizePath(args[[2]], mustWork = TRUE)
@@ -23,6 +33,7 @@ complement <- function(x) chartr("ATGC", "TACG", x)
 is_dna <- function(x) !is.na(x) & nchar(x) == 1L & x %chin% c("A", "C", "G", "T")
 is_palindromic <- function(a1, a2) paste0(a1, a2) %chin% c("AT", "TA", "CG", "GC")
 
+# Build the deployable, nonzero-weight biallelic model.
 message("Reading model weights...")
 weights <- fread(weight_path, select = c("posID", "A1", "A1Effect"))
 weights[, c("CHR", "POS") := tstrsplit(sub("\\[hg19\\]$", "", posID), ":", fixed = TRUE)]
@@ -70,6 +81,7 @@ metadata <- data.table(
 )
 fwrite(metadata, file.path(out_dir, "model", "model_metadata.tsv"), sep = "\t", quote = FALSE)
 
+# Freeze the built-in reference scores; reference genotypes are not required.
 message("Building the built-in control reference...")
 reference_profile <- fread(reference_path)
 required_reference <- c("FID", "IID", "SCORESUM")
@@ -85,6 +97,7 @@ reference_meta <- data.table(
 )
 fwrite(reference_meta, file.path(out_dir, "reference", "reference_metadata.tsv"), sep = "\t", quote = FALSE)
 
+# Recalculate golden PGS values while keeping the fixed test genotypes unchanged.
 message("Preparing score files for the fixed test genotypes...")
 test_bim <- fread(paste0(test_prefix, ".bim"), col.names = c("CHR", "SNP_ID", "CM", "POS", "A1", "A2"))
 test_bim[, `:=`(A1 = toupper(A1), A2 = toupper(A2))]

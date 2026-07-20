@@ -1,13 +1,25 @@
+#!/usr/bin/env Rscript
+# Maintainer/developer tool: run the release acceptance suite against the fixed
+# 10-sample PLINK cohort. Routine users do not need this script.
+#
+# Usage:
+#   Rscript tools/run_acceptance_tests.R
+# PLINK 1.9 is resolved from LN_PRS_TEST_PLINK first, then from PATH. The suite
+# verifies asset hashes, golden PGS values, reports, plots, PED/MAP support, and
+# strict rejection of a reference distribution with fewer than 100 samples.
 suppressPackageStartupMessages(library(data.table))
 args <- commandArgs(trailingOnly = FALSE)
 file_arg <- sub("^--file=", "", args[grepl("^--file=", args)])
 root <- normalizePath(file.path(dirname(file_arg), ".."), winslash = "/", mustWork = TRUE)
 rscript <- Sys.which("Rscript")
 if (!nzchar(rscript)) rscript <- file.path(R.home("bin"), if (.Platform$OS.type == "windows") "Rscript.exe" else "Rscript")
-plink <- Sys.getenv("LN_PRS_TEST_PLINK", "C:/PortableProgram/plink_win64_20250819/plink.exe")
+plink <- Sys.getenv("LN_PRS_TEST_PLINK", "")
+if (!nzchar(plink)) plink <- Sys.which("plink")
+if (!nzchar(plink)) stop("PLINK 1.9 was not found. Set LN_PRS_TEST_PLINK or add plink to PATH.", call. = FALSE)
 work <- tempfile("ln_prs_test_")
 dir.create(work)
 on.exit(unlink(work, recursive = TRUE, force = TRUE), add = TRUE)
+# Verify both the archive and its extracted PLINK files before scoring.
 unzip(file.path(root, "data/test_data/dummy_genome_plink1.zip"), exdir = work)
 archive_manifest <- fread(file.path(root, "data/test_data/archive_contents.sha256.tsv"))
 stopifnot(all(vapply(seq_len(nrow(archive_manifest)), function(i) {

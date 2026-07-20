@@ -59,8 +59,8 @@ Thumbs.db
 *.swp
 *.swo
 
-# Local design document (not distributed)
-0_架构设计.md
+# Local design documents (not distributed)
+/docs/local/
 
 # Frozen runtime model is intentionally versioned
 !data/model/gwas_prior_union.model.rds
