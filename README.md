@@ -1,73 +1,78 @@
 # LN-PriGI-PRS
 
-LN-PriGI-PRS is a standalone command-line tool for calculating a lupus-nephritis polygenic score (PGS) and reporting each sample's percentile relative to a specified reference population.
+LN-PriGI-PRS is a small R command-line tool for calculating a lupus-nephritis polygenic score (PGS) and locating each sample within a reference PGS distribution.
 
-The percentile can support research on lupus-nephritis susceptibility. This software does **not** provide clinical risk interpretation, diagnosis, prognosis, or treatment advice.
+The score and percentile are intended for research. They are not a clinical diagnosis, prognosis, or treatment recommendation.
 
 ## Requirements
 
 - R 4.3 or later
-- R packages: `dplyr`, `data.table`, and `digest`
-- PLINK 1.9 installed locally and available on `PATH`, or supplied with `--plink`
-- Genotypes aligned to the hg19/GRCh37 assembly
+- R packages: `data.table` and `dplyr`
+- PLINK 1.9 available on `PATH`, or supplied with `--plink`
+- Genotypes aligned to hg19/GRCh37
 
-PLINK 2, PGEN/PVAR/PSAM, and VCF inputs are not supported. No liftover is performed.
+The tool accepts PLINK 1 BED/BIM/FAM or PED/MAP files. It does not accept PLINK 2 PGEN files or VCF directly and does not perform liftover or genotype imputation.
 
-## Input
+## Usage
 
-Provide a file prefix for exactly one complete PLINK 1 file set:
-
-- Binary: `PREFIX.bed`, `PREFIX.bim`, and `PREFIX.fam`
-- Text: `PREFIX.ped` and `PREFIX.map`
-
-The program accepts only biallelic variants. A/T and C/G palindromic SNPs are excluded. Variants are aligned by chromosome, hg19 position, and alleles; input variant IDs are not treated as cross-dataset identifiers.
-
-Prepare and impute genotypes before running this tool. The program does not perform genotype imputation. A missing target genotype contributes zero to the raw PGS, and coverage is calculated from the genotype data before this scoring representation is created.
-
-## Basic usage
+Provide the PLINK file prefix without an extension:
 
 ```bash
 Rscript R/main.R \
   --input /path/to/cohort \
-  --genome-build hg19 \
-  --output-dir /path/to/results \
-  --output-prefix ln_prs \
+  --output /path/to/results.tsv
+```
+
+Specify PLINK explicitly when it is not on `PATH`:
+
+```bash
+Rscript R/main.R \
+  --input /path/to/cohort \
+  --output /path/to/results.tsv \
   --plink /path/to/plink
 ```
 
-The score is the uncentered, unstandardized sum produced by PLINK 1.9 `--score ... header sum`. `--maf` and `--geno` are optional conveniences; neither has a default threshold. Because they are estimated from the current input batch, they are not recommended for a single sample or a very small batch.
+Optional arguments:
 
-```bash
-Rscript R/main.R \
-  --input /path/to/cohort \
-  --genome-build hg19 \
-  --output-dir /path/to/results \
-  --maf 0.01 \
-  --geno 0.05 \
-  --plot-mode all
+```text
+--reference-pgs FILE   Use a custom reference PGS table
+--plot                Create one reference-distribution plot per sample
+--overwrite           Replace the requested output and plot directory
+--help                Show command-line help
+--version             Show the software version
 ```
 
-Use `--plot-mode none` to disable per-sample plots. Existing outputs are rejected unless `--overwrite` is supplied; overwrite is restricted to the exact output prefix.
+The program does not apply MAF or genotype-missingness filters. Perform any cohort-specific genotype QC before running LN-PriGI-PRS.
 
-## Custom reference PGS
+## Scoring
 
-`--reference-pgs FILE` completely replaces the built-in reference distribution. The file must be a tab-delimited table with exactly two columns:
+Variants are matched using hg19 chromosome, position, and alleles rather than relying on input variant IDs. Non-palindromic strand complements are supported. A/T and C/G palindromic SNPs are not included in the model because their strand direction cannot be resolved reliably across independently prepared genotype datasets.
+
+PGS is the uncentered, unstandardized PLINK `--score ... header sum` result:
+
+```text
+PGS = sum(effect-allele dosage × weight)
+```
+
+A model variant absent from the input contributes zero. A missing genotype at a matched model variant also contributes zero. Scores are not divided by the number of available variants, so coverage should be considered when comparing datasets.
+
+## Reference distribution and percentile
+
+The built-in reference contains PGS values from 171 control samples scored with the same model and missing-genotype convention used by the tool.
+
+A custom reference must be a tab-delimited file containing at least these columns:
 
 ```text
 sample_id	pgs_score
-sample_001	-4.125
-sample_002	-3.718
+sample_001	-7.124
+sample_002	-6.835
 ```
 
-Requirements:
+Additional columns are allowed and ignored. Sample IDs must be unique and nonblank, and PGS values must be finite with nonzero variance.
 
-- unique, nonblank `sample_id` values;
-- finite numeric `pgs_score` values with nonzero variance;
-- fewer than 100 samples: fatal error;
-- 100–199 samples: warning;
-- absolute adjusted Fisher-Pearson skewness `|G1| > 1`: warning.
+A reference with fewer than 100 samples is rejected. Empirical percentiles based on very small reference sets have coarse resolution and are strongly affected by individual observations, so they are not suitable for the intended comparison.
 
-LN-PriGI-PRS does not build a reference cohort or calculate its PGS. The supplied reference scores must have been calculated with the same frozen model and scoring convention.
+The tool also calculates adjusted Fisher–Pearson skewness, `G1`. When `|G1| > 1`, it reports a warning because a strongly skewed reference distribution can make percentile differences uneven across the PGS range. The calculation still continues because percentiles are derived from the empirical distribution and do not require normality.
 
 Percentiles use midranks:
 
@@ -75,37 +80,36 @@ Percentiles use midranks:
 100 × (number below + 0.5 × number equal) / reference sample count
 ```
 
-## Quality control and outputs
+A percentile describes position within the selected reference distribution; it is not a disease probability.
 
-Nonzero-weight variant coverage is calculated separately for each sample. Coverage below 90% produces a warning but does not suppress the PGS or percentile. The warning appears in the run report, result table, and plot. Absolute-weight coverage is reported descriptively.
+## Output
 
-For output prefix `ln_prs`, the program writes:
+The output TSV contains one row per sample:
 
-- `ln_prs.results.tsv`: one row per FID/IID sample;
-- `ln_prs.run_report.txt`: configuration, warnings, model/reference summaries, commands, and merged PLINK logs;
-- `ln_prs.plots/`: one English PNG per sample when plotting is enabled.
+| Column | Meaning |
+| --- | --- |
+| `FID`, `IID` | PLINK family and individual identifiers |
+| `PGS` | Raw polygenic score |
+| `PERCENTILE` | Midrank percentile in the reference distribution |
+| `MODEL_SNPS` | Number of variants in the bundled model |
+| `SNPS_USED` | Matched, nonmissing model variants for the sample |
+| `VARIANT_COVERAGE` | `SNPS_USED / MODEL_SNPS` |
+| `ABS_WEIGHT_COVERAGE` | Fraction of total absolute model weight represented by matched, nonmissing variants |
+| `REFERENCE_SOURCE` | Built-in or custom reference source |
 
-All program-generated reports, tables, plots, messages, and warning codes are in English.
+With `--plot`, plots are written beside the result table in `RESULTS.plots/`. Plotting is disabled by default.
 
-## Frozen assets and reproducibility
+Existing output is not overwritten unless `--overwrite` is supplied.
 
-The model, built-in reference distribution, fixed 10-sample acceptance dataset, and expected PGS values are versioned with SHA-256 checksums. Runtime assets are verified before scoring. The model is stored as an xz-compressed RDS; fixed PLINK test data are stored in a Deflate ZIP archive.
+## Optional installation check
 
-## Maintainer tools
-
-Routine users only need `R/main.R`. Release maintainers and developers use the clearly separated tools below:
-
-- `tools/run_acceptance_tests.R`: verifies hashes, the fixed 10-sample golden PGS values, reports, plots, and supported PLINK 1 formats.
-- `tools/rebuild_frozen_assets.R`: rebuilds the frozen model, built-in reference, and expected test PGS values after an intentional model/reference update.
-- `tools/package_fixed_test_genotypes.ps1`: packages the unchanged BED/BIM/FAM acceptance cohort and refreshes SHA-256 manifests.
-
-Run the acceptance suite with PLINK 1.9 on `PATH`:
+The bundled dummy genotype data can be used to confirm that R, PLINK, and the tool work together:
 
 ```bash
 Rscript tools/run_acceptance_tests.R
 ```
 
-Alternatively, set `LN_PRS_TEST_PLINK` to the PLINK 1.9 executable. When the model changes, keep the fixed test genotypes unchanged, rebuild and package the assets, refresh checksums, and rerun the acceptance suite. Each tool contains maintainer-oriented usage instructions at the top of the file.
+If PLINK is not on `PATH`, set `LN_PRS_TEST_PLINK` to its executable path.
 
 ## License
 
