@@ -60,7 +60,7 @@ Thumbs.db
 *.swo
 
 # Local design documents (not distributed)
-/docs/local/
+/local_docs/
 
-# Frozen runtime model is intentionally versioned
+# Bundled runtime model is intentionally versioned
 !data/model/gwas_prior_union.model.rds
