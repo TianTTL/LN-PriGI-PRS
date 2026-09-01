@@ -1,6 +1,8 @@
 # LN-PriGI-PRS
 
-LN-PriGI-PRS is a small R command-line tool for calculating a lupus-nephritis polygenic score (PGS) and locating each sample within a reference PGS distribution.
+**LN-PriGI-PRS** stands for **LN-prioritized gene informed-polygenic risk score**. The name reflects its central idea: incorporating lupus nephritis (LN) prioritized-gene information into polygenic risk modeling.
+
+The score was developed from an LN genome-wide association study by translating integrated locus-to-gene prioritization into variant-level annotations for SBayesRC. The released model uses the union of variants in top-ranked gene regions and gene-linked 95% credible sets to inform SNP-effect priors. In an independent Chinese whole-genome sequencing cohort of 372 patients with LN and 200 healthy controls, this model achieved an AUC of 0.807, compared with 0.787 for standard-annotation SBayesRC. This command-line tool applies the model to hg19/GRCh37 genotype data and reports each sample's PGS and percentile within the reference distribution.
 
 The score and percentile are intended for research. They are not a clinical diagnosis, prognosis, or treatment recommendation.
 
